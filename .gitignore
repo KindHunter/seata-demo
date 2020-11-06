@@ -2,9 +2,6 @@
 /.idea/
 *.iml
 /**/target/
-/httpwrapper/apidoc/
 */apidoc/
-httpwrapper/apidoc.zip
 /logs
 /work/*
-src/test/

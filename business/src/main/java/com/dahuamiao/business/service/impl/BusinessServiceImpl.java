@@ -35,7 +35,6 @@ public class BusinessServiceImpl implements BusinessService {
 
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     @GlobalTransactional(timeoutMills = 300000, name = "dubbo-gts-seata-example")
     public ObjectResponse handleBusiness(BusinessDTO businessDTO) {
         System.out.println("开始全局事务，XID = " + RootContext.getXID());
@@ -45,6 +44,15 @@ public class BusinessServiceImpl implements BusinessService {
         commodityDTO.setCommodityCode(businessDTO.getCommodityCode());
         commodityDTO.setCount(businessDTO.getCount());
         ObjectResponse storageResponse = storageDubboService.decreaseStorage(commodityDTO);
+
+
+        try {
+            Thread.sleep(2000L);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+
         //2、创建订单
         OrderDTO orderDTO = new OrderDTO();
         orderDTO.setUserId(businessDTO.getUserId());
@@ -52,6 +60,49 @@ public class BusinessServiceImpl implements BusinessService {
         orderDTO.setOrderCount(businessDTO.getCount());
         orderDTO.setOrderAmount(businessDTO.getAmount());
         ObjectResponse<OrderDTO> response = orderDubboService.createOrder(orderDTO);
+
+        //打开注释测试事务发生异常后，全局回滚功能
+        if (!flag) {
+            throw new RuntimeException("测试抛异常后，分布式事务回滚！");
+        }
+
+        if (storageResponse.getStatus() != 200 || response.getStatus() != 200) {
+            throw new DefaultException(RspStatusEnum.FAIL);
+        }
+
+        objectResponse.setStatus(RspStatusEnum.SUCCESS.getCode());
+        objectResponse.setMessage(RspStatusEnum.SUCCESS.getMessage());
+        objectResponse.setData(response.getData());
+        return objectResponse;
+    }
+
+
+
+    @Override
+    @GlobalTransactional(timeoutMills = 300000, name = "dubbo-gts-seata-example")
+    public ObjectResponse handleBusiness2(BusinessDTO businessDTO) {
+        System.out.println("开始全局事务，XID = " + RootContext.getXID());
+        ObjectResponse<Object> objectResponse = new ObjectResponse<>();
+
+        //2、创建订单
+        OrderDTO orderDTO = new OrderDTO();
+        orderDTO.setUserId(businessDTO.getUserId());
+        orderDTO.setCommodityCode(businessDTO.getCommodityCode());
+        orderDTO.setOrderCount(businessDTO.getCount());
+        orderDTO.setOrderAmount(businessDTO.getAmount());
+        ObjectResponse<OrderDTO> response = orderDubboService.createOrder(orderDTO);
+
+        try {
+            Thread.sleep(2000L);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        //1、扣减库存
+        CommodityDTO commodityDTO = new CommodityDTO();
+        commodityDTO.setCommodityCode(businessDTO.getCommodityCode());
+        commodityDTO.setCount(businessDTO.getCount());
+        ObjectResponse storageResponse = storageDubboService.decreaseStorage(commodityDTO);
 
         //打开注释测试事务发生异常后，全局回滚功能
         if (!flag) {
